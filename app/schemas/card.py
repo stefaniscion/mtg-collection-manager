@@ -1,10 +1,8 @@
 from pydantic import BaseModel
 
 class Card(BaseModel):
-    id: int
-    name: str
-    description: str
-    price: float
-    image: str
-    category: str
-    quantity: int
+    skryfall_id: str
+    altered: bool = False
+    foil: bool = False
+    quantity: int = 1
+    # card_info: dict = None

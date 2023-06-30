@@ -37,18 +37,25 @@ async def read_card_single(card_id: int):
     return card
 @app.post("/card")
 async def create_card(card: Card):
-    '''add cart to database'''
+    '''add card to database'''
     with psycopg.connect(env.db_connection_string, row_factory=dict_row) as db:
         with db.cursor() as curr:
-            curr.execute("SELECT * FROM card LIMIT 10")
-            cards = curr.fetchall()
-    return cards
+            curr.execute("""INSERT INTO card 
+                (skryfall_id, quantity, altered, foil) 
+                VALUES(%s, %s, %s, %s);""", 
+                (card.skryfall_id,card.quantity, card.altered, card.foil))
 @app.put("/card/{card_id}")
 async def update_card(card_id: int, card: Card):
-    pass
+    '''update card by id'''
+    with psycopg.connect(env.db_connection_string, row_factory=dict_row) as db:
+        with db.cursor() as curr:
+            curr.execute("""UPDATE card 
+                SET skryfall_id = %s, quantity = %s, altered = %s, foil = %s
+                WHERE id = %s;""", 
+                (card.skryfall_id,card.quantity, card.altered, card.foil, card_id))
 @app.delete("/card/{card_id}")
 async def delete_card(card_id: int):
-    '''get a single card by id'''
+    '''delete card by id'''
     with psycopg.connect(env.db_connection_string, row_factory=dict_row) as db:
         with db.cursor() as curr:
             curr.execute("DELETE FROM card WHERE id = %s", (card_id,))
