@@ -1,22 +1,42 @@
+import json
 import psycopg
+from modules import skryfall
+from psycopg.rows import dict_row
 from config import env
+from datetime import datetime, timedelta
 
-def update_card_info_in_db(card_list: list):
-    ''' add card info to database if needed '''
-    for card in card_list:
-        # check if card info already in database
-        with psycopg.connect(env.db_connection_string) as db:
-            with db.cursor() as curr:
-                curr.execute("""SELECT *
-                FROM card_info
-                WHERE skryfall_oracle_id = %s""",
-                (card["skryfall_oracle_id"],))
-                card_info = curr.fetchone()
-        # if cards info not in database, add it
-        if not card_info:   
-            with psycopg.connect(env.db_connection_string) as db:
+def fetch_card_info(skryfall_id: str):
+    ''' fetch card info by id from db or from skryfall api '''
+    # check if card is in db
+    with psycopg.connect(env.db_connection_string, row_factory=dict_row) as db:
+        with db.cursor() as curr:
+            curr.execute("""SELECT * 
+                FROM card_cache
+                WHERE skryfall_id = %s""", (skryfall_id,))
+            cache = curr.fetchone()  
+    print("=====================================")
+    print(cache)
+    # if card is in db, return it
+    if cache: 
+        card_info = json.loads(cache["skryfall_data"])
+        expire = cache["expire"]
+        # check if card_cache is expired
+        cache_is_expired = False
+        if datetime.now() > expire:
+            print("cache is expired")
+            cache_is_expired = True
+            with psycopg.connect(env.db_connection_string, row_factory=dict_row) as db:
                 with db.cursor() as curr:
-                    curr.execute("""INSERT INTO card_info
-                    (name, mana_cost, text, type, skryfall_oracle_id, image, art)
-                    VALUES(%s, %s, %s, %s, %s, %s, %s);""",
-                    (card["card_name"], card["mana"], card["text"], card["type"], card["skryfall_oracle_id"], card["image"], card["art"]))
+                    curr.execute("""DELETE FROM card_cache WHERE skryfall_id = %s""", (skryfall_id,))
+    # esle, fetch card from skryfall api and add it to db
+    if not cache or cache_is_expired:
+        card_info = skryfall.fetch_card_info(skryfall_id)
+        expire = datetime.now() + timedelta(days=env.card_cache_expire)
+        skryfall_data =  json.dumps(card_info)
+        # add card to db
+        with psycopg.connect(env.db_connection_string, row_factory=dict_row) as db:
+            with db.cursor() as curr:
+                curr.execute("""INSERT INTO card_cache 
+                (skryfall_id, skryfall_data, expire) 
+                VALUES (%s,%s,%s)""", (skryfall_id, skryfall_data, expire))
+    return card_info

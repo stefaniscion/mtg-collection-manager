@@ -1,8 +1,8 @@
 import re
 import psycopg
+from psycopg.rows import dict_row
 from fastapi import FastAPI
-from modules import utils
-from modules import skryfall
+from modules import utils, skryfall
 from config import env
 from schemas.card import Card
 
@@ -17,29 +17,28 @@ async def root():
 @app.get("/card")
 async def read_card():
     '''get all cards from database'''
-    with psycopg.connect(env.db_connection_string) as db:
+    with psycopg.connect(env.db_connection_string, row_factory=dict_row) as db:
         with db.cursor() as curr:
-            curr.execute("""SELECT * 
-                FROM card
-                INNER JOIN card_info ON card_info.skryfall_oracle_id = card.skryfall_oracle_id
-                """)
+            curr.execute("""SELECT * FROM card""")
             cards = curr.fetchall()
+    for card in cards:
+        card_info = utils.fetch_card_info(card["skryfall_id"])
+        card["card_info"] = card_info
     return cards
 @app.get("/card/{card_id}")
-async def read_card_single(card_id):
+async def read_card_single(card_id: int):
     '''get a single card by id'''
-    with psycopg.connect(env.db_connection_string) as db:
+    with psycopg.connect(env.db_connection_string, row_factory=dict_row) as db:
         with db.cursor() as curr:
             curr.execute("""SELECT * 
                 FROM card
-                INNER JOIN card_info ON card_info.skryfall_oracle_id = card.skryfall_oracle_id
                 WHERE id = %s""", (card_id,))
             card = curr.fetchone()
     return card
 @app.post("/card")
 async def create_card(card: Card):
     '''add cart to database'''
-    with psycopg.connect(env.db_connection_string) as db:
+    with psycopg.connect(env.db_connection_string, row_factory=dict_row) as db:
         with db.cursor() as curr:
             curr.execute("SELECT * FROM card LIMIT 10")
             cards = curr.fetchall()
@@ -48,9 +47,9 @@ async def create_card(card: Card):
 async def update_card(card_id: int, card: Card):
     pass
 @app.delete("/card/{card_id}")
-async def delete_card(card_id):
+async def delete_card(card_id: int):
     '''get a single card by id'''
-    with psycopg.connect(env.db_connection_string) as db:
+    with psycopg.connect(env.db_connection_string, row_factory=dict_row) as db:
         with db.cursor() as curr:
             curr.execute("DELETE FROM card WHERE id = %s", (card_id,))
 # cards other routes
@@ -74,26 +73,11 @@ async def create_card_from_card_list(card_notation_list: list):
             card_info = skryfall.match_card(card["card_name"], card["set"])
         else:
             card_info = skryfall.match_card(card["card_name"])
-        if card_info["object"]:
-            card["set"] = card_info["set"]
-            card["skryfall_oracle_id"] = card_info["oracle_id"]
-            card["number"] = card_info["collector_number"]
-            card["language"] = card_info["lang"]
-            card["mana"] = card_info["mana_cost"]
-            card["text"] = card_info["oracle_text"]
-            card["type"] = card_info["type_line"]
-            card["image"] = card_info["image_uris"]["large"]
-            card["art"] = card_info["image_uris"]["art_crop"]
-        else:
-            card["error"] = 1
-    # update card info in database if needed
-    utils.update_card_info_in_db(card_list)
-    # add cards to database
+        card["skryfall_id"] = card_info["id"]
     for card in card_list:
-        with psycopg.connect(env.db_connection_string) as db:
+        with psycopg.connect(env.db_connection_string, row_factory=dict_row) as db:
             with db.cursor() as curr:
-                curr.execute("""INSERT INTO card
-                ("name", "set", "number", "language", quantity, skryfall_oracle_id)
-                VALUES(%s, %s, %s, %s, %s, %s);""",
-                (card["card_name"], card["set"], card["number"], card["language"], card["num"], card["skryfall_oracle_id"]))
+                curr.execute("""INSERT INTO card (skryfall_id, quantity, altered, foil) 
+                    VALUES(%s, %s, %s, %s);""", 
+                    (card["skryfall_id"],card["num"], False, False))
     return card_list
