@@ -1,4 +1,15 @@
 services:
+  app: 
+    build: app/.
+    restart: always
+    ports:
+      - 8000:8000
+    volumes:
+      - ./app:/opt/mtg-collection-manager
+    links:
+      - db
+    environment:
+      DATABASE_URL: postgres://user:pass@db:5432/mtg-collection
   db:
     image: postgres
     restart: always
@@ -7,4 +18,4 @@ services:
       POSTGRES_PASSWORD: pass
       POSTGRES_DB: mtg-collection
     ports:
-      - "5432:5432"
+      - 5432:5432
