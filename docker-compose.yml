@@ -1,21 +1,33 @@
 services:
-  app: 
-    build: app/.
-    restart: always
+  frontend: 
+    container_name: frontend
+    build: frontend/.
+    restart: on-failure
+    ports:
+      - 5173:5173
+    volumes:
+      - ./frontend:/app
+    links:
+      - backend
+  backend: 
+    container_name: backend
+    build: backend/.
+    restart: on-failure
     ports:
       - 8000:8000
     volumes:
-      - ./app:/opt/mtg-collection-manager
+      - ./backend:/app
     links:
       - db
-    environment:
-      DATABASE_URL: postgres://user:pass@db:5432/mtg-collection
   db:
+    container_name: db
     image: postgres
-    restart: always
+    restart: on-failure
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: pass
       POSTGRES_DB: mtg-collection
+    volumes:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     ports:
       - 5432:5432
