@@ -14,8 +14,6 @@ def fetch_card_info(skryfall_id: str):
                 FROM card_cache
                 WHERE skryfall_id = %s""", (skryfall_id,))
             cache = curr.fetchone()  
-    print("=====================================")
-    print(cache)
     # if card is in db, return it
     if cache: 
         card_info = json.loads(cache["skryfall_data"])
@@ -23,7 +21,6 @@ def fetch_card_info(skryfall_id: str):
         # check if card_cache is expired
         cache_is_expired = False
         if datetime.now() > expire:
-            print("cache is expired")
             cache_is_expired = True
             with psycopg.connect(env.db_connection_string, row_factory=dict_row) as db:
                 with db.cursor() as curr:
