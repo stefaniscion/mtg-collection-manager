@@ -2,11 +2,20 @@ import re
 import psycopg
 from psycopg.rows import dict_row
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from modules import utils, skryfall
 from config import env
 from schemas.card import Card
 
+
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # home route
 @app.get("/")
